@@ -1,186 +1,103 @@
-# import os
-# import cv2  # OpenCV to read and preprocess images
-# import numpy as np
-# from sklearn.model_selection import train_test_split
-# from sklearn.preprocessing import LabelEncoder
-# from sklearn.svm import SVC
-# from sklearn.metrics import accuracy_score
-# from tqdm import tqdm
-
-# # Set up directories
-# data_dir = r"C:\Study\Web Dev\Internship\ARKA\TASK_3\train"  # Update with the actual path
-# categories = ["cat", "dog"]  # Two categories (classes)
-
-# # Image size for resizing (as SVMs don't support large image sizes well)
-# img_size = 64
-
-# # Function to load and preprocess images
-# def load_images(data_dir, categories, img_size):
-#     data = []
-#     labels = []
-
-#     for category in categories:
-#         path = os.path.join(data_dir, category)
-#         class_num = categories.index(category)  # Assigning labels as 0 for 'cat' and 1 for 'dog'
-
-#         for img in tqdm(os.listdir(path)):  # Iterate through all images
-#             try:
-#                 img_path = os.path.join(path, img)
-#                 img_array = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # Convert to grayscale
-#                 resized_img = cv2.resize(img_array, (img_size, img_size))  # Resize to uniform size
-#                 data.append(resized_img.flatten())  # Flatten image (convert 2D to 1D)
-#                 labels.append(class_num)
-#             except Exception as e:
-#                 pass
-
-#     return np.array(data), np.array(labels)
-
-# # Load the dataset
-# print("Loading images...")
-# X, y = load_images(data_dir, categories, img_size)
-
-# print("Images loaded!")
-
-# # Encode labels (not necessary, but good practice if labels are not 0 and 1)
-# label_encoder = LabelEncoder()
-# y = label_encoder.fit_transform(y)
-
-# # Split dataset into training and testing sets
-# print("Splitting dataset into train and test sets...")
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-# print("Data split done!")
-
-# # Initialize and train the SVM model
-# print("Training SVM model...")
-# svm_model = SVC(kernel='linear')  # Linear kernel works well for this task
-# svm_model.fit(X_train, y_train)
-
-# print("SVM model trained!")
-
-# # Make predictions on the test set
-# print("Making predictions on test data...")
-# y_pred = svm_model.predict(X_test)
-# print("Predictions complete!")
-
-# # Evaluate the model
-# accuracy = accuracy_score(y_test, y_pred)
-# print(f"Accuracy: {accuracy * 100:.2f}%")
-
-
 import os
-import cv2  # OpenCV to read and preprocess images
+import cv2
 import numpy as np
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder
-from sklearn.svm import SVC
-from sklearn.metrics import accuracy_score, classification_report
-from tqdm import tqdm
 import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.model_selection import train_test_split
 
-# Set up directories
-data_dir = r"C:\Study\Web Dev\Internship\ARKA\TASK_3\train"  # Update with the actual path
-test_dir = r"C:\Study\Web Dev\Internship\ARKA\TASK_3\test"  # Path to new test images
-categories = ["cat", "dog"]  # Two categories (classes)
+IMG_SIZE = 64  # Size to resize images to (IMG_SIZE x IMG_SIZE)
 
-# Image size for resizing
-img_size = 64
+# Directories
+train_dir = "train"
+test_dir = "test"
 
-# Function to load and preprocess images
-def load_images(data_dir, categories, img_size):
-    data = []
-    labels = []
+# Load and preprocess images
+def load_images_from_folder(folder):
+    images, labels = [], []
+    for label, subfolder in enumerate(['cat', 'dog']):  # cat=0, dog=1
+        subfolder_path = os.path.join(folder, subfolder)
+        for filename in os.listdir(subfolder_path):
+            img_path = os.path.join(subfolder_path, filename)
+            img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            if img is not None:
+                img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+                images.append(img.flatten())
+                labels.append(label)
+    return np.array(images), np.array(labels)
 
-    for category in categories:
-        path = os.path.join(data_dir, category)
-        class_num = categories.index(category)  # Assigning labels as 0 for 'cat' and 1 for 'dog'
+print("Loading training data...")
+X, y = load_images_from_folder(train_dir)
 
-        for img in tqdm(os.listdir(path), desc=f"Loading {category} images"):  # Iterate through all images
-            img_path = os.path.join(path, img)
-            try:
-                img_array = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # Convert to grayscale
-                resized_img = cv2.resize(img_array, (img_size, img_size))  # Resize to uniform size
-                data.append(resized_img.flatten())  # Flatten image (convert 2D to 1D)
-                labels.append(class_num)
-            except Exception as e:
-                print(f"Error loading image {img_path}: {e}")
+# Split into training and validation sets
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
-    return np.array(data), np.array(labels)
+# Scale and apply PCA
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
+X_val = scaler.transform(X_val)
 
-# Function to visualize predictions
-def visualize_predictions(images, true_labels, predicted_labels):
-    plt.figure(figsize=(10, 10))
-    for i in range(9):
-        plt.subplot(3, 3, i + 1)
-        plt.imshow(images[i].reshape(img_size, img_size), cmap='gray')
-        plt.title(f'True: {"Dog" if true_labels[i] == 1 else "Cat"}\nPred: {"Dog" if predicted_labels[i] == 1 else "Cat"}')
-        plt.axis('off')
-    plt.tight_layout()
-    plt.show()
+# PCA to reduce dimensionality
+pca = PCA(n_components=100)  # Using 100 components for a small dataset
+X_train = pca.fit_transform(X_train)
+X_val = pca.transform(X_val)
 
-# Load the dataset
-print("Loading images...")
-X, y = load_images(data_dir, categories, img_size)
-print("Images loaded!")
-
-# Encode labels
-label_encoder = LabelEncoder()
-y = label_encoder.fit_transform(y)
-
-# Split dataset into training and testing sets
-print("Splitting dataset into train and test sets...")
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-print("Data split done!")
-
-# Initialize and train the SVM model
-print("Training SVM model...")
-svm_model = SVC(kernel='linear')  # Linear kernel works well for this task
+# Train the SVM
+print("Training the SVM model...")
+svm_model = SVC(kernel="linear", random_state=42)
 svm_model.fit(X_train, y_train)
-print("SVM model trained!")
 
-# Make predictions on the test set
-print("Making predictions on test data...")
-y_pred = svm_model.predict(X_test)
-print("Predictions complete!")
+# Evaluate on the validation set
+y_val_pred = svm_model.predict(X_val)
+val_accuracy = accuracy_score(y_val, y_val_pred) * 100
+print(f"Validation Accuracy: {val_accuracy:.2f}%")
 
-# Evaluate the model
-accuracy = accuracy_score(y_test, y_pred)
-print(f"Accuracy: {accuracy * 100:.2f}%")
-print("Classification Report:")
-print(classification_report(y_test, y_pred, target_names=categories))
+# Confusion Matrix for validation set
+plt.figure(figsize=(5, 5))
+cm = confusion_matrix(y_val, y_val_pred)
+ConfusionMatrixDisplay(cm, display_labels=["Cat", "Dog"]).plot()
+plt.title("Validation Confusion Matrix")
+plt.show()
 
-# Function to test new images
-def test_new_images(test_dir, categories, img_size, model):
-    test_data = []
-    true_labels = []
+# Testing with new images
+def load_and_preprocess_image(img_path):
+    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        print(f"Error: Could not load image {img_path}")
+        return None
+    img = cv2.resize(img, (IMG_SIZE, IMG_SIZE))
+    img = img.flatten().reshape(1, -1)
+    img = scaler.transform(img)
+    img = pca.transform(img)
+    return img
 
-    for category in categories:
-        path = os.path.join(test_dir, category)
-        class_num = categories.index(category)
+# Test individual images
+cat_test_path = 'test/cat/cat_test57.jpg'
+dog_test_path = 'test/dog/dog_test80.jpg'
 
-        for img in tqdm(os.listdir(path), desc=f"Loading {category} test images"):
-            img_path = os.path.join(path, img)
-            try:
-                img_array = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-                resized_img = cv2.resize(img_array, (img_size, img_size))
-                test_data.append(resized_img.flatten())
-                true_labels.append(class_num)
-            except Exception as e:
-                print(f"Error loading test image {img_path}: {e}")
+print("\nTesting individual images...")
+for img_path, label in zip([cat_test_path, dog_test_path], ["Cat", "Dog"]):
+    img_processed = load_and_preprocess_image(img_path)
+    if img_processed is not None:
+        prediction = svm_model.predict(img_processed)
+        predicted_label = "Cat" if prediction[0] == 0 else "Dog"
+        print(f"Image '{os.path.basename(img_path)}' is predicted as: {predicted_label} (Actual: {label})")
 
-    X_new = np.array(test_data)
-    y_true = np.array(true_labels)
+# Load and test on entire test dataset
+print("\nLoading and testing on entire test dataset...")
+X_test, y_test = load_images_from_folder(test_dir)
+X_test = scaler.transform(X_test)
+X_test = pca.transform(X_test)
 
-    # Predict using the trained model
-    y_pred_new = model.predict(X_new)
+y_test_pred = svm_model.predict(X_test)
+test_accuracy = accuracy_score(y_test, y_test_pred) * 100
+print(f"Test Accuracy: {test_accuracy:.2f}%")
 
-    # Print accuracy for new images
-    accuracy = accuracy_score(y_true, y_pred_new)
-    print(f"Test Accuracy on New Images: {accuracy * 100:.2f}%")
-
-    # Visualize predictions
-    visualize_predictions(X_new, y_true, y_pred_new)
-
-# Test the model with new images
-print("Testing with new images...")
-test_new_images(test_dir, categories, img_size, svm_model)
+# Confusion Matrix for test set
+plt.figure(figsize=(5, 5))
+cm = confusion_matrix(y_test, y_test_pred)
+ConfusionMatrixDisplay(cm, display_labels=["Cat", "Dog"]).plot()
+plt.title("Test Confusion Matrix")
+plt.show()
