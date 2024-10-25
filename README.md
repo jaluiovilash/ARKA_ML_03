@@ -42,5 +42,6 @@ pip install -r requirements.txt
    ```bash
    python dog_cat_svm.py
    ```
+3. Link for the dataset - https://www.kaggle.com/c/dogs-vs-cats/data
 
 The program outputs validation and test accuracy and displays variance analysis graphs for enhanced interpretability.
